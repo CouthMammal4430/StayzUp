@@ -2,6 +2,12 @@ import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
 export async function middleware(request: NextRequest) {
+  // Bypass explicite de l'auth (pour tests/admin) via variable d'env
+  // ATTENTION: à désactiver en production une fois l'auth en place
+  if (process.env.NEXT_PUBLIC_BYPASS_AUTH === "true") {
+    return NextResponse.next();
+  }
+
   // Si Supabase n'est pas configuré, laisser passer toutes les routes
   // (mode développement sans backend)
   if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
