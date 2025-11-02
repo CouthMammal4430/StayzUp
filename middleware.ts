@@ -14,6 +14,14 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
+  // Laisser passer la page de fix auth et les routes publiques
+  if (request.nextUrl.pathname === "/auth-fix" || 
+      request.nextUrl.pathname === "/logout" ||
+      request.nextUrl.pathname === "/debug-auth" ||
+      request.nextUrl.pathname.startsWith("/api")) {
+    return NextResponse.next();
+  }
+
   let response = NextResponse.next({
     request: {
       headers: request.headers,
@@ -77,6 +85,32 @@ export async function middleware(request: NextRequest) {
       redirectUrl.pathname = "/login";
       redirectUrl.searchParams.set("redirect", request.nextUrl.pathname);
       return NextResponse.redirect(redirectUrl);
+    }
+
+    // Si l'utilisateur est connecté, vérifier l'abonnement pour accéder au dashboard
+    if (user && request.nextUrl.pathname.startsWith("/dashboard")) {
+      // Vérifier l'abonnement
+      const { data: subscription } = await supabase
+        .from("subscriptions")
+        .select("status, plan, current_period_end")
+        .eq("user_id", user.id)
+        .maybeSingle();
+
+      // Si pas d'abonnement du tout, rediriger vers /pricing
+      if (!subscription) {
+        return NextResponse.redirect(new URL("/pricing", request.url));
+      }
+
+      const hasActiveSubscription = 
+        (subscription.status === "active" || subscription.status === "trialing") &&
+        (subscription.plan === "lifetime" || 
+         !subscription.current_period_end || 
+         new Date(subscription.current_period_end) > new Date());
+
+      // Pas d'abonnement actif → rediriger vers /pricing
+      if (!hasActiveSubscription) {
+        return NextResponse.redirect(new URL("/pricing", request.url));
+      }
     }
 
     // Si l'utilisateur est connecté et qu'il essaie d'accéder à /login ou /signup, rediriger vers /dashboard

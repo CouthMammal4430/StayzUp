@@ -17,6 +17,10 @@ export const metadata: Metadata = {
     maximumScale: 1,
     userScalable: false,
   },
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "default",
+  },
 };
 
 export default function RootLayout({

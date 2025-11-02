@@ -5,6 +5,7 @@ import { ArrowRight, Zap, Flame, Trophy, TrendingUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import Link from "next/link";
+import Image from "next/image";
 
 export default function Home() {
   return (
@@ -13,12 +14,21 @@ export default function Home() {
       <nav className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="container mx-auto px-4 py-4 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-primary to-purple-600 flex items-center justify-center">
-              <Zap className="h-5 w-5 text-white" />
-            </div>
+            <Image
+              src="/logo.png"
+              alt="StayzUp"
+              width={32}
+              height={32}
+              priority
+            />
             <span className="text-xl font-bold">StayzUp</span>
           </div>
           <div className="flex items-center gap-4">
+            <Link href="/clear-cache.html" target="_blank">
+              <Button variant="ghost" size="sm" className="text-xs hidden md:inline-flex">
+                🔧
+              </Button>
+            </Link>
             <Link href="/login">
               <Button variant="ghost">Connexion</Button>
             </Link>
@@ -72,7 +82,7 @@ export default function Home() {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-5xl mx-auto">
           {[
             {
-              icon: <Zap className="h-8 w-8 text-xp" />,
+              icon: <TrendingUp className="h-8 w-8 text-primary" />,
               title: "Système d'XP",
               description: "Gagnez des points d'expérience à chaque habitude complétée et montez de niveau.",
             },
@@ -137,9 +147,12 @@ export default function Home() {
         <div className="container mx-auto px-4 py-8">
           <div className="flex flex-col md:flex-row items-center justify-between gap-4">
             <div className="flex items-center gap-2">
-              <div className="h-6 w-6 rounded bg-gradient-to-br from-primary to-purple-600 flex items-center justify-center">
-                <Zap className="h-4 w-4 text-white" />
-              </div>
+              <Image
+                src="/logo.png"
+                alt="StayzUp"
+                width={24}
+                height={24}
+              />
               <span className="font-semibold">StayzUp</span>
             </div>
             <p className="text-sm text-muted-foreground">

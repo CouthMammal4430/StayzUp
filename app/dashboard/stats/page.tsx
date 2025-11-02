@@ -1,204 +1,188 @@
 "use client";
 
-import { motion } from "framer-motion";
-import { TrendingUp, Calendar, Target, Award } from "lucide-react";
+import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { ScoresGrid } from "@/components/gamification/ScoreCard";
-
-const mockStats = {
-  totalXP: 12450,
-  currentLevel: 8,
-  totalCompletions: 342,
-  activeHabits: 5,
-  currentStreak: 15,
-  longestStreak: 28,
-};
-
-const mockWeeklyData = [
-  { day: "Lun", completions: 4, xp: 280 },
-  { day: "Mar", completions: 5, xp: 350 },
-  { day: "Mer", completions: 4, xp: 300 },
-  { day: "Jeu", completions: 6, xp: 420 },
-  { day: "Ven", completions: 5, xp: 360 },
-  { day: "Sam", completions: 3, xp: 240 },
-  { day: "Dim", completions: 4, xp: 280 },
-];
-
-const mockScores = [
-  {
-    category: "Cohérence",
-    value: 85,
-    maxValue: 100,
-    icon: <Target className="h-5 w-5 text-blue-500" />,
-    color: "bg-blue-500/10",
-  },
-  {
-    category: "Persévérance",
-    value: 78,
-    maxValue: 100,
-    icon: <TrendingUp className="h-5 w-5 text-green-500" />,
-    color: "bg-green-500/10",
-  },
-  {
-    category: "Diversification",
-    value: 65,
-    maxValue: 100,
-    icon: <Award className="h-5 w-5 text-purple-500" />,
-    color: "bg-purple-500/10",
-  },
-  {
-    category: "Progression",
-    value: 92,
-    maxValue: 100,
-    icon: <Calendar className="h-5 w-5 text-orange-500" />,
-    color: "bg-orange-500/10",
-  },
-];
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { createClient } from "@/lib/supabase/client";
+import { useDashboardStore } from "@/store/useDashboardStore";
+import { TrendingUp, Target } from "lucide-react";
 
 export default function StatsPage() {
-  const overallScore = Math.round(
-    mockScores.reduce((acc, s) => acc + s.value, 0) / mockScores.length
-  );
+  const { stats, loadStats } = useDashboardStore();
+  const [period, setPeriod] = useState<"7" | "30" | "90">("30");
+  const [xpData, setXpData] = useState<{ date: string; xp: number }[]>([]);
+  const [habitsData, setHabitsData] = useState<{ date: string; count: number }[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    // Vérifier cache des graphiques
+    const cacheKey = `stats-graphs-${period}`;
+    const cachedGraphs = sessionStorage.getItem(cacheKey);
+    
+    if (cachedGraphs) {
+      const { xp, habits } = JSON.parse(cachedGraphs);
+      setXpData(xp);
+      setHabitsData(habits);
+      setLoading(false);
+    }
+    
+    // Affichage immédiat si stats en cache
+    if (stats) setLoading(false);
+    else loadStats();
+    
+    // Charger les données (mettra à jour le cache)
+    loadStatsData();
+  }, [period]);
+
+  const loadStatsData = async () => {
+    try {
+      const supabase = createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const days = parseInt(period);
+      const startDate = new Date();
+      startDate.setDate(startDate.getDate() - days + 1);
+      const from = startDate.toISOString().split("T")[0];
+
+      // XP par jour
+      const { data: xp } = await supabase
+        .from("xp_history")
+        .select("created_at, xp_amount")
+        .eq("user_id", user.id)
+        .gte("created_at", from);
+
+      const xpMap: Record<string, number> = {};
+      xp?.forEach((e) => {
+        const d = e.created_at.split("T")[0];
+        xpMap[d] = (xpMap[d] || 0) + e.xp_amount;
+      });
+
+      const xpSeries: { date: string; xp: number }[] = [];
+      for (let i = 0; i < days; i++) {
+        const d = new Date(startDate);
+        d.setDate(startDate.getDate() + i);
+        const key = d.toISOString().split("T")[0];
+        xpSeries.push({ date: key, xp: xpMap[key] || 0 });
+      }
+      setXpData(xpSeries);
+
+      // Habitudes complétées par jour
+      const { data: completions } = await supabase
+        .from("habit_completions")
+        .select("completion_date")
+        .eq("user_id", user.id)
+        .gte("completion_date", from);
+
+      const habitsMap: Record<string, number> = {};
+      completions?.forEach((c) => {
+        habitsMap[c.completion_date] = (habitsMap[c.completion_date] || 0) + 1;
+      });
+
+      const habitsSeries: { date: string; count: number }[] = [];
+      for (let i = 0; i < days; i++) {
+        const d = new Date(startDate);
+        d.setDate(startDate.getDate() + i);
+        const key = d.toISOString().split("T")[0];
+        habitsSeries.push({ date: key, count: habitsMap[key] || 0 });
+      }
+      setHabitsData(habitsSeries);
+      
+      // Mettre en cache les graphiques
+      const cacheKey = `stats-graphs-${period}`;
+      sessionStorage.setItem(cacheKey, JSON.stringify({
+        xp: xpSeries,
+        habits: habitsSeries
+      }));
+    } catch (error) {
+      console.error("Error loading stats:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const maxXP = Math.max(10, ...xpData.map((d) => d.xp));
+  const maxHabits = Math.max(5, ...habitsData.map((d) => d.count));
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div>
-        <h1 className="text-3xl font-bold">Statistiques</h1>
-        <p className="text-muted-foreground mt-1">
-          Suivez votre progression et vos performances
-        </p>
+    <div className="space-y-4 max-w-2xl mx-auto">
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-bold">Statistiques</h1>
+        <Select value={period} onValueChange={(v: any) => setPeriod(v)}>
+          <SelectTrigger className="w-32">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="7">7 jours</SelectItem>
+            <SelectItem value="30">30 jours</SelectItem>
+            <SelectItem value="90">90 jours</SelectItem>
+          </SelectContent>
+        </Select>
       </div>
 
-      {/* Overview Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        {[
-          { label: "XP Total", value: mockStats.totalXP.toLocaleString(), icon: <TrendingUp className="h-5 w-5 text-xp" /> },
-          { label: "Niveau", value: mockStats.currentLevel, icon: <Award className="h-5 w-5 text-level" /> },
-          { label: "Complétions", value: mockStats.totalCompletions, icon: <Target className="h-5 w-5 text-green-500" /> },
-          { label: "Streak", value: `${mockStats.currentStreak} 🔥`, icon: <Calendar className="h-5 w-5 text-streak" /> },
-        ].map((stat, index) => (
-          <motion.div
-            key={stat.label}
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.3, delay: index * 0.1 }}
-          >
-            <Card>
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between mb-2">
-                  <p className="text-sm text-muted-foreground">{stat.label}</p>
-                  <div className="text-muted-foreground">{stat.icon}</div>
+      {/* XP gagné */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base flex items-center gap-2">
+            <TrendingUp className="h-4 w-4 text-primary" />
+            XP gagné
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex gap-1 items-end h-40">
+            {xpData.map((point) => (
+              <div
+                key={point.date}
+                className="flex-1 bg-gradient-to-t from-primary to-purple-600 rounded-t min-h-[2px] relative group"
+                style={{ height: `${(point.xp / maxXP) * 100}%` }}
+              >
+                <div className="absolute bottom-full mb-1 left-1/2 transform -translate-x-1/2 bg-black text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none">
+                  {point.date.split("-")[2]}/{point.date.split("-")[1]}: {point.xp} XP
                 </div>
-                <p className="text-2xl font-bold">{stat.value}</p>
-              </CardContent>
-            </Card>
-          </motion.div>
-        ))}
-      </div>
-
-      {/* Scores */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5, delay: 0.4 }}
-      >
-        <Card>
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <CardTitle>Vos Scores</CardTitle>
-              <div className="text-right">
-                <p className="text-sm text-muted-foreground">Score Global</p>
-                <p className="text-3xl font-bold text-primary">{overallScore}%</p>
               </div>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <ScoresGrid scores={mockScores} />
-          </CardContent>
-        </Card>
-      </motion.div>
+            ))}
+          </div>
+          <div className="mt-2 text-center text-sm text-muted-foreground">
+            Total: {xpData.reduce((sum, d) => sum + d.xp, 0)} XP
+          </div>
+        </CardContent>
+      </Card>
 
-      {/* Weekly Activity */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5, delay: 0.5 }}
-      >
-        <Card>
-          <CardHeader>
-            <CardTitle>Activité de la semaine</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {mockWeeklyData.map((day, index) => (
-                <div key={day.day} className="space-y-2">
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="font-medium">{day.day}</span>
-                    <div className="flex items-center gap-4">
-                      <span className="text-muted-foreground">
-                        {day.completions} complétions
-                      </span>
-                      <span className="font-semibold text-xp">
-                        +{day.xp} XP
-                      </span>
-                    </div>
-                  </div>
-                  <div className="w-full bg-secondary rounded-full h-2">
-                    <motion.div
-                      initial={{ width: 0 }}
-                      animate={{ width: `${(day.completions / 6) * 100}%` }}
-                      transition={{ duration: 0.5, delay: 0.6 + index * 0.1 }}
-                      className="bg-primary h-2 rounded-full"
-                    />
-                  </div>
+      {/* Habitudes complétées */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base flex items-center gap-2">
+            <Target className="h-4 w-4 text-green-500" />
+            Habitudes complétées
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex gap-1 items-end h-40">
+            {habitsData.map((point) => (
+              <div
+                key={point.date}
+                className="flex-1 bg-gradient-to-t from-green-500 to-emerald-600 rounded-t min-h-[2px] relative group"
+                style={{ height: `${(point.count / maxHabits) * 100}%` }}
+              >
+                <div className="absolute bottom-full mb-1 left-1/2 transform -translate-x-1/2 bg-black text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none">
+                  {point.date.split("-")[2]}/{point.date.split("-")[1]}: {point.count} habitudes
                 </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      </motion.div>
-
-      {/* Achievements Placeholder */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5, delay: 0.7 }}
-      >
-        <Card>
-          <CardHeader>
-            <CardTitle>Prochaines Réalisations</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              {[
-                { title: "Streak de 30 jours", progress: 50, icon: "🔥" },
-                { title: "Niveau 10", progress: 80, icon: "⭐" },
-                { title: "100 complétions", progress: 66, icon: "🎯" },
-              ].map((achievement, index) => (
-                <div key={index} className="p-4 border rounded-lg space-y-2">
-                  <div className="flex items-center gap-2">
-                    <span className="text-2xl">{achievement.icon}</span>
-                    <p className="font-medium">{achievement.title}</p>
-                  </div>
-                  <div className="space-y-1">
-                    <div className="w-full bg-secondary rounded-full h-2">
-                      <div
-                        className="bg-primary h-2 rounded-full"
-                        style={{ width: `${achievement.progress}%` }}
-                      />
-                    </div>
-                    <p className="text-xs text-muted-foreground">
-                      {achievement.progress}% complété
-                    </p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      </motion.div>
+              </div>
+            ))}
+          </div>
+          <div className="mt-2 text-center text-sm text-muted-foreground">
+            Total: {habitsData.reduce((sum, d) => sum + d.count, 0)} habitudes
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }
-

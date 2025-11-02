@@ -1,0 +1,191 @@
+export type Language = "fr" | "en";
+
+export const translations = {
+  fr: {
+    // Navigation
+    "nav.home": "Accueil",
+    "nav.habits": "Habitudes",
+    "nav.stats": "Statistiques",
+    "nav.settings": "Paramètres",
+    
+    // Dashboard
+    "dashboard.level": "Niveau",
+    "dashboard.habitsToday": "Habitudes aujourd'hui",
+    "dashboard.dailyProgress": "Progression journalière",
+    "dashboard.currentStreak": "Streak actuel",
+    "dashboard.xpToday": "XP aujourd'hui",
+    "dashboard.monthlyCalendar": "Calendrier mensuel",
+    "dashboard.close": "Fermer",
+    "dashboard.habitsCompleted": "Habitudes réussies",
+    "dashboard.totalXp": "XP total gagné",
+    "dashboard.habitsOfDay": "Habitudes du jour",
+    "dashboard.noHabits": "Aucune habitude ce jour-là",
+    
+    // Habits
+    "habits.new": "+ nouvelle habitude",
+    "habits.today": "Aujourd'hui",
+    "habits.noHabits": "Aucune habitude. Créez-en une !",
+    "habits.days.monday": "Lu",
+    "habits.days.tuesday": "Ma",
+    "habits.days.wednesday": "Me",
+    "habits.days.thursday": "Je",
+    "habits.days.friday": "Ve",
+    "habits.days.saturday": "Sa",
+    "habits.days.sunday": "Di",
+    
+    // Stats
+    "stats.title": "Statistiques",
+    "stats.period": "Période",
+    "stats.xpGained": "XP gagné",
+    "stats.habitsCompleted": "Habitudes réussies",
+    "stats.7days": "7 jours",
+    "stats.30days": "30 jours",
+    "stats.90days": "90 jours",
+    
+    // Settings
+    "settings.title": "Paramètres",
+    "settings.profile": "Profil",
+    "settings.email": "Email",
+    "settings.name": "Nom",
+    "settings.editProfile": "Modifier le profil",
+    "settings.subscription": "Abonnement",
+    "settings.currentPlan": "Plan actuel",
+    "settings.manageSubscription": "Gérer mon abonnement",
+    "settings.choosePlan": "Choisir un plan",
+    "settings.appearance": "Apparence",
+    "settings.theme": "Thème",
+    "settings.themeDesc": "Clair ou sombre",
+    "settings.language": "Langue",
+    "settings.languageDesc": "Choisir la langue",
+    "settings.notifications": "Notifications",
+    "settings.notificationsDesc": "Gestion des notifications à venir...",
+    "settings.logout": "Se déconnecter",
+    "settings.noSubscription": "Aucun abonnement",
+    "settings.viewPlans": "Voir les plans",
+    "settings.notDefined": "Non défini",
+    
+    // Profile edit
+    "profile.title": "Modifier le profil",
+    "profile.preview": "Aperçu",
+    "profile.information": "Informations",
+    "profile.yourName": "Votre nom",
+    "profile.photo": "Photo de profil",
+    "profile.coloredInitial": "Initiale colorée",
+    "profile.imageUrl": "URL Image",
+    "profile.backgroundColor": "Couleur de fond",
+    "profile.imageUrlPlaceholder": "https://example.com/photo.jpg",
+    "profile.imageUrlDesc": "Entrez l'URL d'une image ou utilisez un service comme Imgur",
+    "profile.frame": "Cadre de profil",
+    "profile.noFrame": "Aucun cadre",
+    "profile.changePassword": "Changer le mot de passe",
+    "profile.newPassword": "Nouveau mot de passe",
+    "profile.confirmPassword": "Confirmer le mot de passe",
+    "profile.passwordPlaceholder": "Minimum 8 caractères",
+    "profile.cancel": "Annuler",
+    "profile.save": "Enregistrer",
+    "profile.saving": "Enregistrement...",
+    
+    // Common
+    "common.active": "Actif",
+    "common.inactive": "Inactif",
+    "common.loading": "Chargement...",
+    "common.error": "Erreur",
+    "common.success": "Succès",
+  },
+  en: {
+    // Navigation
+    "nav.home": "Home",
+    "nav.habits": "Habits",
+    "nav.stats": "Statistics",
+    "nav.settings": "Settings",
+    
+    // Dashboard
+    "dashboard.level": "Level",
+    "dashboard.habitsToday": "Habits today",
+    "dashboard.dailyProgress": "Daily progress",
+    "dashboard.currentStreak": "Current streak",
+    "dashboard.xpToday": "XP today",
+    "dashboard.monthlyCalendar": "Monthly calendar",
+    "dashboard.close": "Close",
+    "dashboard.habitsCompleted": "Habits completed",
+    "dashboard.totalXp": "Total XP gained",
+    "dashboard.habitsOfDay": "Habits of the day",
+    "dashboard.noHabits": "No habits on this day",
+    
+    // Habits
+    "habits.new": "+ new habit",
+    "habits.today": "Today",
+    "habits.noHabits": "No habits. Create one!",
+    "habits.days.monday": "Mon",
+    "habits.days.tuesday": "Tue",
+    "habits.days.wednesday": "Wed",
+    "habits.days.thursday": "Thu",
+    "habits.days.friday": "Fri",
+    "habits.days.saturday": "Sat",
+    "habits.days.sunday": "Sun",
+    
+    // Stats
+    "stats.title": "Statistics",
+    "stats.period": "Period",
+    "stats.xpGained": "XP gained",
+    "stats.habitsCompleted": "Habits completed",
+    "stats.7days": "7 days",
+    "stats.30days": "30 days",
+    "stats.90days": "90 days",
+    
+    // Settings
+    "settings.title": "Settings",
+    "settings.profile": "Profile",
+    "settings.email": "Email",
+    "settings.name": "Name",
+    "settings.editProfile": "Edit profile",
+    "settings.subscription": "Subscription",
+    "settings.currentPlan": "Current plan",
+    "settings.manageSubscription": "Manage subscription",
+    "settings.choosePlan": "Choose plan",
+    "settings.appearance": "Appearance",
+    "settings.theme": "Theme",
+    "settings.themeDesc": "Light or dark",
+    "settings.language": "Language",
+    "settings.languageDesc": "Choose language",
+    "settings.notifications": "Notifications",
+    "settings.notificationsDesc": "Notification management coming soon...",
+    "settings.logout": "Log out",
+    "settings.noSubscription": "No subscription",
+    "settings.viewPlans": "View plans",
+    "settings.notDefined": "Not defined",
+    
+    // Profile edit
+    "profile.title": "Edit profile",
+    "profile.preview": "Preview",
+    "profile.information": "Information",
+    "profile.yourName": "Your name",
+    "profile.photo": "Profile picture",
+    "profile.coloredInitial": "Colored initial",
+    "profile.imageUrl": "Image URL",
+    "profile.backgroundColor": "Background color",
+    "profile.imageUrlPlaceholder": "https://example.com/photo.jpg",
+    "profile.imageUrlDesc": "Enter an image URL or use a service like Imgur",
+    "profile.frame": "Profile frame",
+    "profile.noFrame": "No frame",
+    "profile.changePassword": "Change password",
+    "profile.newPassword": "New password",
+    "profile.confirmPassword": "Confirm password",
+    "profile.passwordPlaceholder": "Minimum 8 characters",
+    "profile.cancel": "Cancel",
+    "profile.save": "Save",
+    "profile.saving": "Saving...",
+    
+    // Common
+    "common.active": "Active",
+    "common.inactive": "Inactive",
+    "common.loading": "Loading...",
+    "common.error": "Error",
+    "common.success": "Success",
+  },
+};
+
+export function t(key: string, lang: Language = "fr"): string {
+  return translations[lang][key as keyof typeof translations.fr] || key;
+}
+

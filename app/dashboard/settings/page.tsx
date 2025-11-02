@@ -1,197 +1,383 @@
 "use client";
 
-import { useState } from "react";
-import { motion } from "framer-motion";
-import { Save, Bell, Moon, Sun, Globe } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Select } from "@/components/ui/select";
+import { Badge } from "@/components/ui/badge";
+import { 
+  CreditCard, 
+  LogOut, 
+  User, 
+  Bell,
+  Palette,
+  Globe
+} from "lucide-react";
+import { useRouter } from "next/navigation";
+import { createClient } from "@/lib/supabase/client";
+import { useDashboardStore } from "@/store/useDashboardStore";
+import { useLanguageStore } from "@/store/useLanguageStore";
+import { t } from "@/lib/i18n/translations";
+import { ThemeToggle } from "@/components/ui/theme-toggle";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import Link from "next/link";
+
+interface Subscription {
+  id: string;
+  plan: string;
+  status: string;
+  current_period_end: string | null;
+  cancel_at_period_end: boolean;
+}
 
 export default function SettingsPage() {
-  const [settings, setSettings] = useState({
-    theme: "system",
-    language: "fr",
-    notifications: true,
-    reminderTime: "09:00",
-    weekStartDay: "monday",
-  });
+  const router = useRouter();
+  const { stats, loadStats } = useDashboardStore();
+  const { language, setLanguage } = useLanguageStore();
+  const [subscription, setSubscription] = useState<Subscription | null>(null);
+  const [user, setUser] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
 
-  const handleChange = (name: string, value: string | boolean) => {
-    setSettings({
-      ...settings,
-      [name]: value,
-    });
+  useEffect(() => {
+    // Vérifier cache sessionStorage
+    const cachedUser = sessionStorage.getItem("user_data");
+    const cachedSub = sessionStorage.getItem("subscription_data");
+    
+    if (cachedUser && cachedSub) {
+      setUser(JSON.parse(cachedUser));
+      setSubscription(JSON.parse(cachedSub));
+      setLoading(false);
+    }
+    
+    // Affichage immédiat si stats en cache
+    if (stats) setLoading(false);
+    else loadStats();
+    
+    // Toujours recharger en arrière-plan pour actualiser
+    loadData();
+  }, []);
+
+  const loadData = async () => {
+    try {
+      const supabase = createClient();
+      const { data: { user: authUser } } = await supabase.auth.getUser();
+      if (!authUser) return;
+
+      setUser(authUser);
+      sessionStorage.setItem("user_data", JSON.stringify(authUser));
+
+      const { data: sub } = await supabase
+        .from("subscriptions")
+        .select("*")
+        .eq("user_id", authUser.id)
+        .single();
+
+      if (sub) {
+        setSubscription(sub as any);
+        sessionStorage.setItem("subscription_data", JSON.stringify(sub));
+      }
+    } catch (error) {
+      console.error("Error loading data:", error);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleSave = () => {
-    // TODO: Sauvegarder les paramètres
-    console.log("Settings saved:", settings);
+  const handleLogout = async () => {
+    try {
+      const supabase = createClient();
+      await supabase.auth.signOut();
+      // Nettoyer le cache
+      sessionStorage.clear();
+      router.push("/login");
+    } catch (error) {
+      console.error("Error logging out:", error);
+    }
   };
+
+  const handleManageSubscription = async () => {
+    try {
+      const response = await fetch("/api/stripe/create-portal-session", {
+        method: "POST",
+      });
+      const data = await response.json();
+      
+      if (!response.ok) {
+        console.error("Erreur API:", data.error);
+        alert(`Erreur: ${data.error || "Impossible de charger le portail"}`);
+        return;
+      }
+      
+      if (data.url) {
+        window.location.href = data.url;
+      } else {
+        alert("Erreur: URL du portail non disponible");
+      }
+    } catch (error) {
+      console.error("Error:", error);
+      alert("Une erreur s'est produite lors de l'ouverture du portail");
+    }
+  };
+
+  const handleResetData = async () => {
+    const confirmed = window.confirm(
+      "⚠️ ATTENTION ⚠️\n\nVoulez-vous vraiment réinitialiser TOUTES vos données ?\n\n" +
+      "Cela supprimera :\n" +
+      "• Toutes vos habitudes\n" +
+      "• Toutes vos complétions\n" +
+      "• Tout votre XP et vos statistiques\n" +
+      "• Votre historique complet\n\n" +
+      "Cette action est IRRÉVERSIBLE !\n\n" +
+      "Votre profil (nom, photo) et votre abonnement seront conservés."
+    );
+
+    if (!confirmed) return;
+
+    const doubleConfirm = window.confirm(
+      "Êtes-vous ABSOLUMENT sûr ?\n\n" +
+      "Tapez OK pour confirmer la suppression définitive."
+    );
+
+    if (!doubleConfirm) return;
+
+    try {
+      setLoading(true);
+      const supabase = createClient();
+      const { data: { user: authUser } } = await supabase.auth.getUser();
+      if (!authUser) return;
+
+      // Supprimer toutes les données de l'utilisateur
+      await Promise.all([
+        // Supprimer les complétions
+        supabase.from("habit_completions").delete().eq("user_id", authUser.id),
+        // Supprimer les habitudes
+        supabase.from("habits").delete().eq("user_id", authUser.id),
+        // Supprimer l'historique XP
+        supabase.from("xp_history").delete().eq("user_id", authUser.id),
+        // Réinitialiser les stats
+        supabase.from("user_stats").delete().eq("user_id", authUser.id),
+      ]);
+
+      // Créer de nouvelles stats vierges
+      await supabase.from("user_stats").insert({
+        user_id: authUser.id,
+        total_xp: 0,
+        current_level: 1,
+        current_rank: "Débutant",
+        current_streak: 0,
+        longest_streak: 0,
+        total_habits_completed: 0,
+        consistency_score: 0,
+        perseverance_score: 0,
+        diversification_score: 0,
+        progression_score: 0,
+        overall_score: 0,
+      });
+
+      // Nettoyer tous les caches
+      sessionStorage.clear();
+      
+      alert("✅ Toutes vos données ont été réinitialisées avec succès !");
+      
+      // Recharger la page
+      window.location.reload();
+    } catch (error) {
+      console.error("Erreur réinitialisation:", error);
+      alert("❌ Erreur lors de la réinitialisation. Veuillez réessayer.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const getPlanName = (plan: string) => {
+    const names: Record<string, string> = {
+      monthly: "Mensuel",
+      yearly: "Annuel",
+      lifetime: "Lifetime",
+      trial: "Essai gratuit",
+    };
+    return names[plan] || plan;
+  };
+
+  const getStatusBadge = (status: string) => {
+    switch (status) {
+      case "active":
+        return <Badge className="bg-green-500">Actif</Badge>;
+      case "trialing":
+        return <Badge className="bg-blue-500">Essai</Badge>;
+      case "cancelled":
+        return <Badge variant="destructive">Annulé</Badge>;
+      default:
+        return <Badge variant="outline">{status}</Badge>;
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
 
   return (
-    <div className="max-w-3xl mx-auto space-y-6">
-      {/* Header */}
-      <div>
-        <h1 className="text-3xl font-bold">Paramètres</h1>
-        <p className="text-muted-foreground mt-1">
-          Personnalisez votre expérience StayzUp
-        </p>
-      </div>
+    <div className="space-y-4 max-w-2xl mx-auto">
+      <h1 className="text-2xl font-bold">Paramètres</h1>
 
-      {/* Appearance */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.3 }}
-      >
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Sun className="h-5 w-5" />
-              Apparence
-            </CardTitle>
-            <CardDescription>
-              Choisissez votre thème et vos préférences d&apos;affichage
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="theme">Thème</Label>
-              <Select
-                id="theme"
-                value={settings.theme}
-                onChange={(e) => handleChange("theme", e.target.value)}
-              >
-                <option value="light">Clair</option>
-                <option value="dark">Sombre</option>
-                <option value="system">Système</option>
-              </Select>
+      {/* Profil */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base flex items-center gap-2">
+            <User className="h-4 w-4" />
+            Profil
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div>
+            <p className="text-sm text-muted-foreground">Email</p>
+            <p className="font-medium">{user?.email}</p>
+          </div>
+          <div>
+            <p className="text-sm text-muted-foreground">Nom</p>
+            <p className="font-medium">
+              {user?.user_metadata?.name || "Non défini"}
+            </p>
+          </div>
+          <Link href="/dashboard/settings/profile">
+            <Button variant="outline" className="w-full">
+              Modifier le profil
+            </Button>
+          </Link>
+        </CardContent>
+      </Card>
+
+      {/* Abonnement */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base flex items-center gap-2">
+            <CreditCard className="h-4 w-4" />
+            Abonnement
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {subscription ? (
+            <>
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="font-semibold">Plan {getPlanName(subscription.plan)}</p>
+                  {subscription.current_period_end && subscription.plan !== "lifetime" && (
+                    <p className="text-xs text-muted-foreground">
+                      {subscription.cancel_at_period_end
+                        ? `Expire le ${new Date(subscription.current_period_end).toLocaleDateString("fr-FR")}`
+                        : `Renouvellement le ${new Date(subscription.current_period_end).toLocaleDateString("fr-FR")}`}
+                    </p>
+                  )}
+                  {subscription.plan === "lifetime" && (
+                    <p className="text-xs text-muted-foreground">Accès à vie</p>
+                  )}
+                </div>
+                {getStatusBadge(subscription.status)}
+              </div>
+              {subscription.plan !== "lifetime" && subscription.plan !== "trial" && (
+                <Button onClick={handleManageSubscription} className="w-full" variant="outline">
+                  Gérer mon abonnement
+                </Button>
+              )}
+              {subscription.plan === "trial" && (
+                <Link href="/pricing">
+                  <Button className="w-full">Choisir un plan</Button>
+                </Link>
+              )}
+            </>
+          ) : (
+            <div className="text-center py-4">
+              <p className="text-sm text-muted-foreground mb-3">Aucun abonnement</p>
+              <Link href="/pricing">
+                <Button className="w-full">Voir les plans</Button>
+              </Link>
             </div>
-          </CardContent>
-        </Card>
-      </motion.div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Apparence */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base flex items-center gap-2">
+            <Palette className="h-4 w-4" />
+            {t("settings.appearance", language)}
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="font-medium">{t("settings.theme", language)}</p>
+              <p className="text-xs text-muted-foreground">{t("settings.themeDesc", language)}</p>
+            </div>
+            <ThemeToggle />
+          </div>
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="font-medium">{t("settings.language", language)}</p>
+              <p className="text-xs text-muted-foreground">{t("settings.languageDesc", language)}</p>
+            </div>
+            <Select value={language} onValueChange={(val: "fr" | "en") => setLanguage(val)}>
+              <SelectTrigger className="w-32">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="fr">🇫🇷 Français</SelectItem>
+                <SelectItem value="en">🇬🇧 English</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Notifications */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.3, delay: 0.1 }}
-      >
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Bell className="h-5 w-5" />
-              Notifications
-            </CardTitle>
-            <CardDescription>
-              Configurez vos rappels et notifications
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <Label htmlFor="notifications">Activer les notifications</Label>
-                <p className="text-sm text-muted-foreground">
-                  Recevez des rappels pour compléter vos habitudes
-                </p>
-              </div>
-              <input
-                type="checkbox"
-                id="notifications"
-                checked={settings.notifications}
-                onChange={(e) => handleChange("notifications", e.target.checked)}
-                className="rounded border-gray-300"
-              />
-            </div>
-            {settings.notifications && (
-              <div className="space-y-2">
-                <Label htmlFor="reminderTime">Heure de rappel</Label>
-                <input
-                  type="time"
-                  id="reminderTime"
-                  value={settings.reminderTime}
-                  onChange={(e) => handleChange("reminderTime", e.target.value)}
-                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                />
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </motion.div>
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base flex items-center gap-2">
+            <Bell className="h-4 w-4" />
+            Notifications
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-sm text-muted-foreground">
+            Gestion des notifications à venir...
+          </p>
+        </CardContent>
+      </Card>
 
-      {/* Language & Region */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.3, delay: 0.2 }}
-      >
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Globe className="h-5 w-5" />
-              Langue et région
-            </CardTitle>
-            <CardDescription>
-              Choisissez votre langue préférée
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="language">Langue</Label>
-              <Select
-                id="language"
-                value={settings.language}
-                onChange={(e) => handleChange("language", e.target.value)}
-              >
-                <option value="fr">Français</option>
-                <option value="en">English</option>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="weekStartDay">Premier jour de la semaine</Label>
-              <Select
-                id="weekStartDay"
-                value={settings.weekStartDay}
-                onChange={(e) => handleChange("weekStartDay", e.target.value)}
-              >
-                <option value="monday">Lundi</option>
-                <option value="sunday">Dimanche</option>
-              </Select>
-            </div>
-          </CardContent>
-        </Card>
-      </motion.div>
-
-      {/* Account Settings Placeholder */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.3, delay: 0.3 }}
-      >
-        <Card>
-          <CardHeader>
-            <CardTitle>Compte</CardTitle>
-            <CardDescription>
-              Gérez les paramètres de votre compte
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <p className="text-sm text-muted-foreground">
-              Les paramètres de compte seront disponibles après la mise en place de l&apos;authentification.
+      {/* Danger Zone */}
+      <Card className="border-destructive/50">
+        <CardHeader>
+          <CardTitle className="text-base text-destructive">Zone dangereuse</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div>
+            <p className="text-sm mb-2">
+              Réinitialiser toutes vos données (habitudes, XP, statistiques). Cette action est <span className="font-bold">irréversible</span>.
             </p>
-          </CardContent>
-        </Card>
-      </motion.div>
+            <Button 
+              onClick={handleResetData} 
+              variant="destructive" 
+              className="w-full"
+            >
+              Réinitialiser mes données
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
 
-      {/* Save Button */}
-      <div className="flex justify-end">
-        <Button onClick={handleSave} size="lg">
-          <Save className="mr-2 h-4 w-4" />
-          Enregistrer les paramètres
-        </Button>
-      </div>
+      {/* Déconnexion */}
+      <Card>
+        <CardContent className="p-4">
+          <Button onClick={handleLogout} variant="outline" className="w-full">
+            <LogOut className="mr-2 h-4 w-4" />
+            Se déconnecter
+          </Button>
+        </CardContent>
+      </Card>
     </div>
   );
 }
-

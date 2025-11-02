@@ -1,12 +1,15 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { Zap, Home, Calendar, BarChart3, Settings, LogOut, Menu, X } from "lucide-react";
+import Image from "next/image";
+import { usePathname, useRouter } from "next/navigation";
+import { Home, Calendar, BarChart3, Settings, LogOut, Menu, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
+import { createClient } from "@/lib/supabase/client";
 
 const navItems = [
   { href: "/dashboard", label: "Dashboard", icon: Home },
@@ -17,7 +20,18 @@ const navItems = [
 
 export function Navbar() {
   const pathname = usePathname();
+  const router = useRouter();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  const handleLogout = async () => {
+    try {
+      const supabase = createClient();
+      await supabase.auth.signOut();
+      router.push("/login");
+    } catch (error) {
+      console.error("Error logging out:", error);
+    }
+  };
 
   return (
     <nav className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 sticky top-0 z-50">
@@ -25,9 +39,13 @@ export function Navbar() {
         <div className="flex items-center justify-between h-16">
           {/* Logo */}
           <Link href="/dashboard" className="flex items-center gap-2">
-            <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-primary to-purple-600 flex items-center justify-center">
-              <Zap className="h-5 w-5 text-white" />
-            </div>
+            <Image
+              src="/logo.png"
+              alt="StayzUp"
+              width={32}
+              height={32}
+              priority
+            />
             <span className="text-xl font-bold">StayzUp</span>
           </Link>
 
@@ -55,11 +73,12 @@ export function Navbar() {
 
           {/* User Menu */}
           <div className="hidden md:flex items-center gap-4">
+            <ThemeToggle />
             <Avatar>
               <AvatarImage src="" alt="User" />
               <AvatarFallback>JD</AvatarFallback>
             </Avatar>
-            <Button variant="ghost" size="icon">
+            <Button variant="ghost" size="icon" onClick={handleLogout} title="Se déconnecter">
               <LogOut className="h-4 w-4" />
             </Button>
           </div>
@@ -104,7 +123,7 @@ export function Navbar() {
                 </Avatar>
                 <span className="font-medium">Utilisateur</span>
               </div>
-              <Button variant="ghost" size="icon">
+              <Button variant="ghost" size="icon" onClick={handleLogout} title="Se déconnecter">
                 <LogOut className="h-4 w-4" />
               </Button>
             </div>
